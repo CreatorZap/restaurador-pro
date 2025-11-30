@@ -1,64 +1,63 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { MercadoPagoConfig, Payment } from 'mercadopago';
 
-// Storage temporário (em produção, usar banco de dados como Supabase/MongoDB)
-// Para Vercel, precisamos de um banco externo pois serverless não mantém estado
-const processedPayments = new Set<string>();
-
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   // CORS
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
   }
 
+  // Health check para GET
+  if (req.method === 'GET') {
+    return res.status(200).json({ status: 'webhook active' });
+  }
+
   // Responder imediatamente ao Mercado Pago
-  res.status(200).json({ received: true });
+  if (req.method === 'POST') {
+    console.log('Webhook received:', JSON.stringify(req.body));
+    
+    try {
+      const { type, data } = req.body || {};
 
-  // Processar webhook assincronamente
-  try {
-    const { type, data } = req.body;
-
-    if (type === 'payment' && data?.id) {
-      const paymentId = String(data.id);
-      
-      // Evitar duplicatas
-      if (processedPayments.has(paymentId)) {
-        console.log(`Pagamento ${paymentId} já processado`);
-        return;
-      }
-
-      const accessToken = process.env.MERCADOPAGO_ACCESS_TOKEN;
-      if (!accessToken) return;
-
-      const client = new MercadoPagoConfig({ accessToken });
-      const payment = new Payment(client);
-      
-      const paymentInfo = await payment.get({ id: paymentId });
-
-      if (paymentInfo.status === 'approved') {
-        console.log(`✅ Pagamento aprovado: ${paymentId}`);
+      if (type === 'payment' && data?.id) {
+        const paymentId = String(data.id);
+        console.log(`Payment notification: ${paymentId}`);
         
-        // Marcar como processado
-        processedPayments.add(paymentId);
-
-        // Parse external_reference
-        const externalRef = paymentInfo.external_reference;
-        if (externalRef) {
-          const data = JSON.parse(externalRef);
-          console.log(`📧 Email: ${data.email}`);
-          console.log(`📦 Pacote: ${data.packageName}`);
-          console.log(`💰 Créditos: ${data.credits}`);
+        const accessToken = process.env.MERCADOPAGO_ACCESS_TOKEN;
+        if (accessToken) {
+          const client = new MercadoPagoConfig({ accessToken });
+          const payment = new Payment(client);
           
-          // TODO: Aqui você deve salvar em um banco de dados
-          // e enviar email com o código para o usuário
+          try {
+            const paymentInfo = await payment.get({ id: paymentId });
+            
+            if (paymentInfo.status === 'approved') {
+              console.log(`✅ Pagamento aprovado: ${paymentId}`);
+              
+              const externalRef = paymentInfo.external_reference;
+              if (externalRef) {
+                const refData = JSON.parse(externalRef);
+                console.log(`📧 Email: ${refData.email}`);
+                console.log(`📦 Pacote: ${refData.packageName}`);
+                console.log(`💰 Créditos: ${refData.credits}`);
+              }
+            }
+          } catch (paymentError) {
+            console.log(`Payment fetch error: ${paymentError}`);
+          }
         }
       }
+
+      return res.status(200).json({ received: true });
+    } catch (error) {
+      console.error('Webhook error:', error);
+      return res.status(200).json({ received: true, error: 'Processing error' });
     }
-  } catch (error) {
-    console.error('Erro no webhook:', error);
   }
+
+  return res.status(405).json({ error: 'Method not allowed' });
 }
