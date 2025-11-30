@@ -240,7 +240,6 @@ export function PricingSection({ onBuyCredits }: PricingSectionProps) {
 
               <div className="bg-white/5 rounded-xl p-4 text-sm text-gray-400">
                 <p>📧 Você receberá um código único por email</p>
-                <p>💳 Pagamento simulado (integrar Mercado Pago)</p>
               </div>
 
               <div className="flex gap-3">
