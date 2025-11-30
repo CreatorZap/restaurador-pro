@@ -56,7 +56,7 @@ export function PricingSection({ onBuyCredits }: PricingSectionProps) {
       if (result.success && result.data) {
         // Redirecionar para página de pagamento do Mercado Pago
         // Use sandboxInitPoint para testes, initPoint para produção
-        const paymentUrl = result.data.sandboxInitPoint || result.data.initPoint;
+        const paymentUrl = result.data.initPoint || result.data.sandboxInitPoint;
         
         console.log('🔗 Redirecionando para Mercado Pago:', paymentUrl);
         
