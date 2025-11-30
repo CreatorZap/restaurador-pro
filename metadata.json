@@ -1,0 +1,5 @@
+{
+  "name": "Restaurador de Fotos Antigas",
+  "description": "Sistema automático de restauração, colorização e reparo de fotografias históricas utilizando IA.",
+  "requestFramePermissions": []
+}
