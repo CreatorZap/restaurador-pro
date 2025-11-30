@@ -89,6 +89,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     console.log(`📦 Pacote: ${packageName}`);
     console.log(`💰 Créditos: ${credits}`);
 
+    // Verificar se já existe código para este pagamento
+    const { data: existingCode } = await supabase
+      .from('credit_codes')
+      .select('*')
+      .eq('payment_id', paymentId)
+      .single();
+
+    if (existingCode) {
+      console.log(`⚠️ Código já existe para este pagamento: ${existingCode.code}`);
+      return res.status(200).json({
+        received: true,
+        success: true,
+        code: existingCode.code,
+        duplicate: true,
+      });
+    }
+
     // Gerar código
     const code = generateCode();
     const expiresAt = new Date();
@@ -119,8 +136,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // Enviar email
     try {
-      await resend.emails.send({
-        from: 'FotoMagic Pro <noreply@fotomagicpro.com>',
+      const emailResult = await resend.emails.send({
+        from: process.env.RESEND_FROM_EMAIL || 'onboarding@resend.dev',
         to: email,
         subject: `🎉 Seu código FotoMagic Pro: ${code}`,
         html: `
@@ -147,9 +164,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           </div>
         `,
       });
-      console.log(`📨 Email enviado para: ${email}`);
-    } catch (emailError) {
-      console.error('❌ Erro ao enviar email:', emailError);
+      
+      if (emailResult.error) {
+        console.error('❌ Erro Resend:', JSON.stringify(emailResult.error));
+        throw emailResult.error;
+      }
+      
+      console.log(`📨 Email enviado! ID: ${emailResult.data?.id}`);
+    } catch (emailError: any) {
+      console.error('❌ ERRO AO ENVIAR EMAIL:', {
+        message: emailError?.message,
+        name: emailError?.name,
+        stack: emailError?.stack,
+        full: JSON.stringify(emailError)
+      });
+      // Não retornar erro - código já foi criado
     }
 
     return res.status(200).json({

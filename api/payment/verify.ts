@@ -122,7 +122,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // Enviar email em background (não bloqueia)
     resend.emails.send({
-      from: 'FotoMagic Pro <noreply@fotomagicpro.com>',
+      from: process.env.RESEND_FROM_EMAIL || 'onboarding@resend.dev',
       to: email,
       subject: `🎉 Seu código FotoMagic Pro: ${code}`,
       html: `
