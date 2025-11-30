@@ -1,16 +1,16 @@
 // Cliente para API de códigos
 
 // Detectar ambiente e configurar URL da API
-const getApiUrl = () => {
+const getApiBaseUrl = () => {
   // Em produção, usar mesma origem (Vercel)
   if (import.meta.env.PROD) {
-    return '/api/codes';
+    return '';
   }
   // Em desenvolvimento, usar servidor local
-  return 'http://localhost:3001/api/codes';
+  return 'http://localhost:3001';
 };
 
-const API_URL = getApiUrl();
+const API_BASE = getApiBaseUrl();
 
 interface CreditCode {
   code: string;
@@ -39,7 +39,7 @@ export async function apiCreateCode(
   packageName: string
 ): Promise<ApiResponse<CreditCode>> {
   try {
-    const response = await fetch(`${API_URL}?action=create`, {
+    const response = await fetch(`${API_BASE}/api/codes?action=create`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, credits, packageName }),
@@ -56,7 +56,7 @@ export async function apiCreateCode(
  */
 export async function apiValidateCode(code: string): Promise<ApiResponse<CreditCode>> {
   try {
-    const response = await fetch(`${API_URL}?action=validate&code=${encodeURIComponent(code)}`);
+    const response = await fetch(`${API_BASE}/api/codes?action=validate&code=${encodeURIComponent(code)}`);
     return await response.json();
   } catch (error) {
     console.error('API Error:', error);
@@ -69,7 +69,7 @@ export async function apiValidateCode(code: string): Promise<ApiResponse<CreditC
  */
 export async function apiUseCredit(code: string): Promise<ApiResponse<{ creditsRemaining: number }>> {
   try {
-    const response = await fetch(`${API_URL}?action=use`, {
+    const response = await fetch(`${API_BASE}/api/codes?action=use`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ code }),
@@ -99,7 +99,7 @@ export async function apiCreatePayment(
   email: string
 ): Promise<ApiResponse<PaymentCreateResponse>> {
   try {
-    const response = await fetch(`${API_URL.replace('/codes', '/payment/create')}`, {
+    const response = await fetch(`${API_BASE}/api/payment/create`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ packageId, email }),
@@ -118,7 +118,7 @@ export async function apiCheckPaymentStatus(
   paymentId: string
 ): Promise<ApiResponse<{ status: string; statusDetail: string }>> {
   try {
-    const response = await fetch(`${API_URL.replace('/codes', `/payment/status/${paymentId}`)}`);
+    const response = await fetch(`${API_BASE}/api/payment/status/${paymentId}`);
     return await response.json();
   } catch (error) {
     console.error('API Error:', error);
@@ -134,7 +134,7 @@ export async function apiSimulatePayment(
   email: string
 ): Promise<ApiResponse<CreditCode>> {
   try {
-    const response = await fetch(`${API_URL.replace('/codes', '/payment/simulate')}`, {
+    const response = await fetch(`${API_BASE}/api/payment/simulate`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ packageId, email }),
