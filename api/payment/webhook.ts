@@ -1,5 +1,10 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { MercadoPagoConfig, Payment } from 'mercadopago';
+import { createCreditCode } from '../lib/supabase';
+import { sendCodeEmail } from '../lib/email';
+
+// Set para evitar processamento duplicado (em memória - OK para serverless)
+const processedPayments = new Set<string>();
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   // CORS
@@ -11,53 +16,111 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(200).end();
   }
 
-  // Health check para GET
+  // Health check
   if (req.method === 'GET') {
     return res.status(200).json({ status: 'webhook active' });
   }
 
-  // Responder imediatamente ao Mercado Pago
-  if (req.method === 'POST') {
-    console.log('Webhook received:', JSON.stringify(req.body));
-    
-    try {
-      const { type, data } = req.body || {};
-
-      if (type === 'payment' && data?.id) {
-        const paymentId = String(data.id);
-        console.log(`Payment notification: ${paymentId}`);
-        
-        const accessToken = process.env.MERCADOPAGO_ACCESS_TOKEN;
-        if (accessToken) {
-          const client = new MercadoPagoConfig({ accessToken });
-          const payment = new Payment(client);
-          
-          try {
-            const paymentInfo = await payment.get({ id: paymentId });
-            
-            if (paymentInfo.status === 'approved') {
-              console.log(`✅ Pagamento aprovado: ${paymentId}`);
-              
-              const externalRef = paymentInfo.external_reference;
-              if (externalRef) {
-                const refData = JSON.parse(externalRef);
-                console.log(`📧 Email: ${refData.email}`);
-                console.log(`📦 Pacote: ${refData.packageName}`);
-                console.log(`💰 Créditos: ${refData.credits}`);
-              }
-            }
-          } catch (paymentError) {
-            console.log(`Payment fetch error: ${paymentError}`);
-          }
-        }
-      }
-
-      return res.status(200).json({ received: true });
-    } catch (error) {
-      console.error('Webhook error:', error);
-      return res.status(200).json({ received: true, error: 'Processing error' });
-    }
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  return res.status(405).json({ error: 'Method not allowed' });
+  // Log da requisição
+  console.log('🔔 Webhook recebido:', JSON.stringify(req.body));
+
+  try {
+    const { type, data } = req.body || {};
+
+    // Responder imediatamente ao Mercado Pago
+    if (type !== 'payment' || !data?.id) {
+      return res.status(200).json({ received: true, message: 'Not a payment notification' });
+    }
+
+    const paymentId = String(data.id);
+
+    // Evitar duplicatas
+    if (processedPayments.has(paymentId)) {
+      console.log(`⚠️ Pagamento ${paymentId} já processado`);
+      return res.status(200).json({ received: true, message: 'Already processed' });
+    }
+
+    const accessToken = process.env.MERCADOPAGO_ACCESS_TOKEN;
+    if (!accessToken) {
+      console.error('❌ MERCADOPAGO_ACCESS_TOKEN não configurado');
+      return res.status(200).json({ received: true, error: 'Missing config' });
+    }
+
+    // Buscar detalhes do pagamento
+    const client = new MercadoPagoConfig({ accessToken });
+    const payment = new Payment(client);
+    const paymentInfo = await payment.get({ id: paymentId });
+
+    console.log(`📋 Status do pagamento: ${paymentInfo.status}`);
+
+    if (paymentInfo.status !== 'approved') {
+      console.log(`⏳ Pagamento não aprovado: ${paymentInfo.status}`);
+      return res.status(200).json({ received: true, status: paymentInfo.status });
+    }
+
+    // Pagamento aprovado! Processar...
+    console.log(`✅ Pagamento aprovado: ${paymentId}`);
+    processedPayments.add(paymentId);
+
+    // Parse external_reference (contém dados do pedido)
+    let orderData;
+    try {
+      orderData = JSON.parse(paymentInfo.external_reference || '{}');
+    } catch {
+      console.error('❌ Erro ao parsear external_reference');
+      orderData = {};
+    }
+
+    const email = orderData.email || paymentInfo.payer?.email;
+    const credits = orderData.credits || 10;
+    const packageName = orderData.packageName || 'Pacote';
+
+    if (!email) {
+      console.error('❌ Email não encontrado no pagamento');
+      return res.status(200).json({ received: true, error: 'Email not found' });
+    }
+
+    console.log(`📧 Email: ${email}`);
+    console.log(`📦 Pacote: ${packageName}`);
+    console.log(`💰 Créditos: ${credits}`);
+
+    // Criar código no Supabase
+    const codeData = await createCreditCode({
+      email,
+      credits,
+      packageName,
+      paymentId,
+    });
+
+    console.log(`🎟️ Código gerado: ${codeData.code}`);
+
+    // Enviar email
+    const emailResult = await sendCodeEmail({
+      email,
+      code: codeData.code,
+      packageName,
+      credits,
+    });
+
+    if (emailResult.success) {
+      console.log(`📨 Email enviado para: ${email}`);
+    } else {
+      console.error(`❌ Erro ao enviar email:`, emailResult.error);
+    }
+
+    return res.status(200).json({
+      received: true,
+      success: true,
+      code: codeData.code,
+      emailSent: emailResult.success,
+    });
+
+  } catch (error) {
+    console.error('❌ Erro no webhook:', error);
+    return res.status(200).json({ received: true, error: 'Processing error' });
+  }
 }
