@@ -60,9 +60,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       back_urls: {
         success: `${siteUrl}/?status=success&package=${packageId}`,
         failure: `${siteUrl}/?status=failure`,
-        pending: `${siteUrl}/?status=pending` 
+        pending: `${siteUrl}/?status=pending`
       },
       auto_return: 'approved' as const,
+      notification_url: `${siteUrl}/api/payment/webhook`,
       external_reference: JSON.stringify({
         email,
         packageId,
@@ -86,9 +87,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   } catch (error: any) {
     console.error('Erro Mercado Pago:', error);
-    return res.status(500).json({ 
-      success: false, 
-      error: `Erro ao criar pagamento: ${error.message}` 
+    return res.status(500).json({
+      success: false,
+      error: `Erro ao criar pagamento: ${error.message}`
     });
   }
 }
