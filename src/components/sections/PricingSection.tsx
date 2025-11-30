@@ -54,6 +54,19 @@ export function PricingSection({ onBuyCredits }: PricingSectionProps) {
       const result = await apiCreatePayment(selectedPlan.id, email);
       
       if (result.success && result.data) {
+        // Rastrear evento de início de checkout no Google Analytics
+        if (typeof window !== 'undefined' && (window as any).gtag) {
+          (window as any).gtag('event', 'begin_checkout', {
+            currency: 'BRL',
+            value: selectedPlan.price,
+            items: [{
+              item_name: selectedPlan.name,
+              price: selectedPlan.price
+            }]
+          });
+          console.log('📊 Analytics: begin_checkout', selectedPlan.name);
+        }
+        
         // Redirecionar para página de pagamento do Mercado Pago
         // Use sandboxInitPoint para testes, initPoint para produção
         const paymentUrl = result.data.initPoint || result.data.sandboxInitPoint;

@@ -42,6 +42,24 @@ export function PaymentSuccess() {
         setCredits(data.credits);
         setPackageName(data.packageName);
         setIsLoading(false);
+        
+        // Rastrear conversão no Google Analytics
+        if (typeof window !== 'undefined' && (window as any).gtag) {
+          // Buscar preço do pacote (estimativa baseada nos créditos)
+          const priceEstimate = data.credits <= 10 ? 19 : data.credits <= 35 ? 49 : 99;
+          
+          (window as any).gtag('event', 'purchase', {
+            transaction_id: paymentId,
+            currency: 'BRL',
+            value: priceEstimate,
+            items: [{
+              item_name: data.packageName,
+              price: priceEstimate,
+              quantity: 1
+            }]
+          });
+          console.log('📊 Analytics: purchase', data.packageName);
+        }
       } else if (data.pending) {
         // Pagamento ainda processando, tentar novamente
         if (retryCount < 10) {
