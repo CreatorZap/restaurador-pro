@@ -37,7 +37,7 @@ export function Header({
                 <Camera size={20} className="text-white" />
               </div>
               <span className="font-bold text-lg text-white hidden sm:block">
-                FotoRestore AI
+                FotoMagic Pro
               </span>
             </a>
 

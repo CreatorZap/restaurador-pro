@@ -9,7 +9,7 @@ export function Footer() {
           <div className="w-8 h-8 bg-gradient-to-br from-violet-500 to-amber-500 rounded-lg flex items-center justify-center text-white text-sm">
             <Camera size={16} />
           </div>
-          FotoRestore AI
+          FotoMagic Pro
         </div>
         <nav className="flex gap-8 text-zinc-500 text-sm font-medium">
           <a href="#" className="hover:text-white transition-colors">Termos de Uso</a>
@@ -18,7 +18,7 @@ export function Footer() {
           <a href="#" className="hover:text-white transition-colors">Contato</a>
         </nav>
         <div className="text-zinc-600 text-sm">
-          © 2024 FotoRestore AI. Todos os direitos reservados.
+          © 2024 FotoMagic Pro. Todos os direitos reservados.
         </div>
       </div>
     </footer>

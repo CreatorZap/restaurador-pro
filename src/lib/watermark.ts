@@ -1,6 +1,6 @@
 export function addWatermark(
   imageUrl: string, 
-  text: string = 'FotoRestore AI - Versão Gratuita'
+  text: string = 'FotoMagic Pro - Versão Gratuita'
 ): Promise<string> {
   return new Promise((resolve, reject) => {
     const canvas = document.createElement('canvas');
