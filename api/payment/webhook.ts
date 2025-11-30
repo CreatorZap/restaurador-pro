@@ -120,7 +120,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // Enviar email
     try {
       await resend.emails.send({
-        from: 'FotoMagic Pro <onboarding@resend.dev>',
+        from: 'FotoMagic Pro <noreply@fotomagicpro.com>',
         to: email,
         subject: `🎉 Seu código FotoMagic Pro: ${code}`,
         html: `
