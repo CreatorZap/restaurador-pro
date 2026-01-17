@@ -21,49 +21,38 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Buscar ou criar perfil do usuário
-  const fetchOrCreateProfile = useCallback(async (userId: string, email: string) => {
+  // Buscar perfil do usuário
+  const fetchProfile = useCallback(async (userId: string) => {
+    console.log('[AuthContext] fetchProfile iniciado para userId:', userId);
+    
     try {
-      // Tentar buscar perfil existente
-      const { data: existingProfile, error: fetchError } = await supabase
+      console.log('[AuthContext] Fazendo query ao Supabase...');
+      
+      const { data, error } = await supabase
         .from('user_profiles')
         .select('*')
         .eq('id', userId)
         .single();
 
-      if (existingProfile) {
-        setProfile(existingProfile);
-        return existingProfile;
+      console.log('[AuthContext] Query completada!');
+      console.log('[AuthContext] Data:', data);
+      console.log('[AuthContext] Error:', error);
+
+      if (error) {
+        console.error('[AuthContext] Erro na query:', error.message, error.code);
+        return null;
       }
 
-      // Se não existe, criar novo perfil
-      if (fetchError && fetchError.code === 'PGRST116') {
-        const { data: newProfile, error: createError } = await supabase
-          .from('user_profiles')
-          .insert({
-            id: userId,
-            email: email,
-            full_name: null,
-            avatar_url: null,
-            free_credits_used: 0,
-            free_credits_limit: 2
-          })
-          .select()
-          .single();
-
-        if (createError) {
-          console.error('Erro ao criar perfil:', createError);
-          return null;
-        }
-
-        setProfile(newProfile);
-        return newProfile;
-      }
-
-      console.error('Erro ao buscar perfil:', fetchError);
-      return null;
-    } catch (error) {
-      console.error('Erro inesperado ao buscar/criar perfil:', error);
+      // #region agent log
+      fetch('http://127.0.0.1:7246/ingest/22b696ed-e64c-420f-a07d-eb89ece11458',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'AuthContext.tsx:fetchProfile',message:'profile loaded from DB',data:{userId,profile:data,free_credits_limit:data?.free_credits_limit,free_credits_used:data?.free_credits_used},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A,C'})}).catch(()=>{});
+      // #endregion
+      
+      setProfile(data as UserProfile);
+      console.log('[AuthContext] Profile definido no state:', data);
+      
+      return data as UserProfile;
+    } catch (err) {
+      console.error('[AuthContext] Erro catch:', err);
       return null;
     }
   }, []);
@@ -71,8 +60,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Atualizar perfil
   const refreshProfile = useCallback(async () => {
     if (!user) return;
-    await fetchOrCreateProfile(user.id, user.email || '');
-  }, [user, fetchOrCreateProfile]);
+    await fetchProfile(user.id);
+  }, [user, fetchProfile]);
 
   // Login com Magic Link (Email)
   const signInWithEmail = useCallback(async (email: string): Promise<{ success: boolean; error?: string }> => {
@@ -138,7 +127,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (currentSession?.user) {
           setSession(currentSession);
           setUser(currentSession.user);
-          await fetchOrCreateProfile(currentSession.user.id, currentSession.user.email || '');
+          console.log('[AuthContext] initAuth - Chamando fetchProfile...');
+          await fetchProfile(currentSession.user.id);
         }
       } catch (error) {
         console.error('Erro ao inicializar auth:', error);
@@ -153,12 +143,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, newSession) => {
         console.log('Auth state changed:', event);
+        console.log('[AuthContext] onAuthStateChange - user:', newSession?.user?.id, newSession?.user?.email);
 
         setSession(newSession);
         setUser(newSession?.user || null);
 
         if (newSession?.user) {
-          await fetchOrCreateProfile(newSession.user.id, newSession.user.email || '');
+          console.log('[AuthContext] onAuthStateChange - Chamando fetchProfile...');
+          await fetchProfile(newSession.user.id);
         } else {
           setProfile(null);
         }
@@ -170,7 +162,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => {
       subscription.unsubscribe();
     };
-  }, [fetchOrCreateProfile]);
+  }, [fetchProfile]);
 
   const value: AuthContextType = {
     user,

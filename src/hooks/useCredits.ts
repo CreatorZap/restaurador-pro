@@ -28,6 +28,9 @@ const ACTIVE_CODE_KEY = 'fotorestore_active_code';
 
 export function useCredits(): UseCreditsReturn {
   const { user, profile, refreshProfile } = useAuth();
+  // #region agent log
+  fetch('http://127.0.0.1:7246/ingest/22b696ed-e64c-420f-a07d-eb89ece11458',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useCredits.ts:30',message:'useCredits hook entry',data:{hasUser:!!user,hasProfile:!!profile,profileData:profile?{free_credits_limit:profile.free_credits_limit,free_credits_used:profile.free_credits_used}:null},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A,C'})}).catch(()=>{});
+  // #endregion
   const [isLoading, setIsLoading] = useState(false);
   const [credits, setCredits] = useState<LocalCredits>(() => {
     // Inicializar com código ativo do localStorage (se houver)
@@ -44,9 +47,15 @@ export function useCredits(): UseCreditsReturn {
   const freeCredits = profile
     ? profile.free_credits_limit - profile.free_credits_used
     : 0;
+  // #region agent log
+  fetch('http://127.0.0.1:7246/ingest/22b696ed-e64c-420f-a07d-eb89ece11458',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useCredits.ts:47',message:'freeCredits calculation',data:{profile:!!profile,free_credits_limit:profile?.free_credits_limit,free_credits_used:profile?.free_credits_used,calculatedFreeCredits:freeCredits},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A,B,D'})}).catch(()=>{});
+  // #endregion
 
   // Total = créditos grátis + créditos do código
   const totalCredits = freeCredits + credits.codeCredits;
+  // #region agent log
+  fetch('http://127.0.0.1:7246/ingest/22b696ed-e64c-420f-a07d-eb89ece11458',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useCredits.ts:52',message:'totalCredits calculation',data:{freeCredits,codeCredits:credits.codeCredits,totalCredits},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
+  // #endregion
   const hasActiveCode = !!credits.code;
   const activeCodeCredits = credits.codeCredits;
 
