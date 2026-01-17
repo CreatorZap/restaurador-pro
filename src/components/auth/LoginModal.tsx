@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { X, Mail, Loader2, CheckCircle2, Sparkles } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
-import { cn } from '@/lib/utils';
 
 interface LoginModalProps {
   isOpen: boolean;
@@ -11,7 +10,8 @@ interface LoginModalProps {
 export function LoginModal({ isOpen, onClose }: LoginModalProps) {
   const { signInWithEmail, signInWithGoogle } = useAuth();
   const [email, setEmail] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [loadingEmail, setLoadingEmail] = useState(false);
+  const [loadingGoogle, setLoadingGoogle] = useState(false);
   const [emailSent, setEmailSent] = useState(false);
   const [error, setError] = useState('');
 
@@ -23,12 +23,12 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
       return;
     }
 
-    setLoading(true);
+    setLoadingEmail(true);
     setError('');
 
     const result = await signInWithEmail(email);
 
-    setLoading(false);
+    setLoadingEmail(false);
 
     if (result.success) {
       setEmailSent(true);
@@ -38,13 +38,13 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
   };
 
   const handleGoogleLogin = async () => {
-    setLoading(true);
+    setLoadingGoogle(true);
     setError('');
 
     const result = await signInWithGoogle();
 
     if (!result.success) {
-      setLoading(false);
+      setLoadingGoogle(false);
       setError(result.error || 'Erro ao conectar com Google');
     }
     // Se sucesso, será redirecionado automaticamente
@@ -54,7 +54,8 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
     setEmail('');
     setError('');
     setEmailSent(false);
-    setLoading(false);
+    setLoadingEmail(false);
+    setLoadingGoogle(false);
     onClose();
   };
 
@@ -116,10 +117,10 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
             {/* Botão Google */}
             <button
               onClick={handleGoogleLogin}
-              disabled={loading}
+              disabled={loadingEmail || loadingGoogle}
               className="w-full flex items-center justify-center gap-3 px-4 py-3 bg-white text-gray-900 rounded-xl font-semibold hover:bg-gray-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed mb-4"
             >
-              {loading ? (
+              {loadingGoogle ? (
                 <Loader2 className="w-5 h-5 animate-spin" />
               ) : (
                 <svg className="w-5 h-5" viewBox="0 0 24 24">
@@ -165,7 +166,7 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
                     value={email}
                     onChange={e => setEmail(e.target.value)}
                     placeholder="seu@email.com"
-                    disabled={loading}
+                    disabled={loadingEmail || loadingGoogle}
                     className="w-full pl-10 pr-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500 disabled:opacity-50"
                   />
                 </div>
@@ -173,10 +174,10 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
 
               <button
                 type="submit"
-                disabled={loading || !email}
+                disabled={loadingEmail || loadingGoogle || !email}
                 className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-violet-600 to-violet-700 text-white rounded-xl font-semibold hover:from-violet-500 hover:to-violet-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {loading ? (
+                {loadingEmail ? (
                   <Loader2 className="w-5 h-5 animate-spin" />
                 ) : (
                   <Mail className="w-5 h-5" />
