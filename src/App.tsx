@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useState } from 'react';
+import { AuthProvider } from '@/contexts/AuthContext';
 import { Header } from '@/components/layout/Header';
 import { Footer } from '@/components/layout/Footer';
 import { HeroSection } from '@/components/sections/HeroSection';
@@ -11,21 +12,27 @@ import { TestimonialsSection } from '@/components/sections/TestimonialsSection';
 import { CTASection } from '@/components/sections/CTASection';
 import { CodeStatus } from '@/components/features/CodeStatus';
 import { Toast, useToast } from '@/components/ui/Toast';
+import { LoginModal } from '@/components/auth';
 import { useCredits } from '@/hooks/useCredits';
 
-export default function App() {
-  const { 
-    credits, 
-    totalCredits, 
+function AppContent() {
+  const {
+    credits,
+    totalCredits,
+    freeCredits,
     hasActiveCode,
     activeCodeCredits,
-    useCredit, 
+    useCredit,
     activateCode,
     deactivateCode,
-    addCreditsWithCode 
+    addCreditsWithCode
   } = useCredits();
-  
+
   const { toast, showToast, hideToast } = useToast();
+  const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
+
+  const handleOpenLogin = () => setIsLoginModalOpen(true);
+  const handleCloseLogin = () => setIsLoginModalOpen(false);
 
   const handleBuyCredits = async (email: string, amount: number, packageName: string): Promise<string | null> => {
     const code = await addCreditsWithCode(email, amount, packageName);
@@ -60,18 +67,20 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-gray-950 text-white">
-      <Header 
+      <Header
         credits={totalCredits}
+        freeCredits={freeCredits}
         hasActiveCode={hasActiveCode}
         activeCode={credits.code}
         onActivateCode={handleActivateCode}
+        onOpenLogin={handleOpenLogin}
       />
-      
+
       <main>
         <HeroSection />
         <ExamplesSection />
         <HowItWorksSection />
-        
+
         {/* Status do Código Ativo */}
         {hasActiveCode && credits.code && (
           <div className="max-w-3xl mx-auto px-4 -mt-8 mb-8">
@@ -82,12 +91,13 @@ export default function App() {
             />
           </div>
         )}
-        
-        <UploadSection 
+
+        <UploadSection
           credits={credits}
           totalCredits={totalCredits}
           onUseCredit={useCredit}
           onRestoreComplete={handleRestoreComplete}
+          onOpenLogin={handleOpenLogin}
         />
         <FeaturesSection />
         <PricingSection onBuyCredits={handleBuyCredits} />
@@ -96,13 +106,27 @@ export default function App() {
       </main>
 
       <Footer />
-      
+
       <Toast
         message={toast.message}
         type={toast.type}
         isVisible={toast.isVisible}
         onClose={hideToast}
       />
+
+      {/* Modal de Login */}
+      <LoginModal
+        isOpen={isLoginModalOpen}
+        onClose={handleCloseLogin}
+      />
     </div>
+  );
+}
+
+export default function App() {
+  return (
+    <AuthProvider>
+      <AppContent />
+    </AuthProvider>
   );
 }

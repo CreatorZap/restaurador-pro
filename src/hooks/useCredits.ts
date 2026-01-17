@@ -1,5 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { apiCreateCode, apiValidateCode, apiUseCredit } from '@/lib/api';
+import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/lib/supabase';
 
 interface LocalCredits {
   free: number;
@@ -11,6 +13,7 @@ interface LocalCredits {
 interface UseCreditsReturn {
   credits: LocalCredits;
   totalCredits: number;
+  freeCredits: number;
   hasActiveCode: boolean;
   activeCodeCredits: number;
   isLoading: boolean;
@@ -21,51 +24,40 @@ interface UseCreditsReturn {
   refreshCredits: () => Promise<void>;
 }
 
-const STORAGE_KEY = 'fotorestore_local_credits';
 const ACTIVE_CODE_KEY = 'fotorestore_active_code';
-const INITIAL_FREE_CREDITS = 2;
 
 export function useCredits(): UseCreditsReturn {
+  const { user, profile, refreshProfile } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [credits, setCredits] = useState<LocalCredits>(() => {
-    if (typeof window === 'undefined') {
-      return { free: INITIAL_FREE_CREDITS, code: null, codeCredits: 0, isPaidUser: false };
-    }
-
-    const saved = localStorage.getItem(STORAGE_KEY);
-    let localCredits: LocalCredits = { 
-      free: INITIAL_FREE_CREDITS, 
-      code: null, 
-      codeCredits: 0, 
-      isPaidUser: false 
+    // Inicializar com código ativo do localStorage (se houver)
+    const activeCode = typeof window !== 'undefined' ? localStorage.getItem(ACTIVE_CODE_KEY) : null;
+    return {
+      free: 0, // Será calculado do profile
+      code: activeCode,
+      codeCredits: 0,
+      isPaidUser: false
     };
-
-    if (saved) {
-      try {
-        localCredits = JSON.parse(saved);
-      } catch {
-        // Mantém valores padrão
-      }
-    }
-
-    // Verificar código ativo
-    const activeCode = localStorage.getItem(ACTIVE_CODE_KEY);
-    if (activeCode) {
-      localCredits.code = activeCode;
-    }
-
-    return localCredits;
   });
 
-  // Salvar mudanças no localStorage
+  // Calcular créditos grátis do profile (Supabase)
+  const freeCredits = profile
+    ? profile.free_credits_limit - profile.free_credits_used
+    : 0;
+
+  // Total = créditos grátis + créditos do código
+  const totalCredits = freeCredits + credits.codeCredits;
+  const hasActiveCode = !!credits.code;
+  const activeCodeCredits = credits.codeCredits;
+
+  // Salvar código ativo no localStorage
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(credits));
     if (credits.code) {
       localStorage.setItem(ACTIVE_CODE_KEY, credits.code);
     } else {
       localStorage.removeItem(ACTIVE_CODE_KEY);
     }
-  }, [credits]);
+  }, [credits.code]);
 
   // Validar código ativo ao iniciar
   useEffect(() => {
@@ -73,10 +65,6 @@ export function useCredits(): UseCreditsReturn {
       refreshCredits();
     }
   }, []);
-
-  const totalCredits = credits.free + credits.codeCredits;
-  const hasActiveCode = !!credits.code;
-  const activeCodeCredits = credits.codeCredits;
 
   // Atualizar créditos do código via API
   const refreshCredits = useCallback(async () => {
@@ -115,21 +103,64 @@ export function useCredits(): UseCreditsReturn {
           ...prev,
           codeCredits: result.data?.creditsRemaining || 0
         }));
+
+        // Registrar restauração no banco (opcional - com código)
+        if (user) {
+          try {
+            await supabase.from('restorations').insert({
+              user_id: user.id,
+              credit_code_id: null, // TODO: mapear código para ID
+              used_free_credit: false,
+              restoration_type: 'auto'
+            });
+          } catch (error) {
+            console.error('Erro ao registrar restauração:', error);
+          }
+        }
+
         return { success: true, hasWatermark: false };
       }
     }
 
     // Se não tem código ou acabou, usa crédito gratuito (com marca d'água)
-    if (credits.free > 0) {
-      setCredits(prev => ({
-        ...prev,
-        free: prev.free - 1
-      }));
-      return { success: true, hasWatermark: true };
+    if (user && profile && freeCredits > 0) {
+      setIsLoading(true);
+
+      try {
+        // Atualizar free_credits_used no Supabase
+        const { error } = await supabase
+          .from('user_profiles')
+          .update({ free_credits_used: profile.free_credits_used + 1 })
+          .eq('id', user.id);
+
+        if (error) {
+          console.error('Erro ao usar crédito grátis:', error);
+          setIsLoading(false);
+          return { success: false, hasWatermark: true };
+        }
+
+        // Registrar restauração no banco
+        await supabase.from('restorations').insert({
+          user_id: user.id,
+          credit_code_id: null,
+          used_free_credit: true,
+          restoration_type: 'auto'
+        });
+
+        // Atualizar profile local
+        await refreshProfile();
+
+        setIsLoading(false);
+        return { success: true, hasWatermark: true };
+      } catch (error) {
+        console.error('Erro ao processar crédito:', error);
+        setIsLoading(false);
+        return { success: false, hasWatermark: true };
+      }
     }
 
     return { success: false, hasWatermark: true };
-  }, [credits]);
+  }, [credits, user, profile, freeCredits, refreshProfile]);
 
   // Ativar um código via API
   const activateCode = useCallback(async (inputCode: string) => {
@@ -165,8 +196,8 @@ export function useCredits(): UseCreditsReturn {
 
   // Criar novo código via API após pagamento
   const addCreditsWithCode = useCallback(async (
-    email: string, 
-    amount: number, 
+    email: string,
+    amount: number,
     packageName: string
   ): Promise<string | null> => {
     setIsLoading(true);
@@ -191,8 +222,12 @@ export function useCredits(): UseCreditsReturn {
   }, []);
 
   return {
-    credits,
+    credits: {
+      ...credits,
+      free: freeCredits // Usar créditos do profile
+    },
     totalCredits,
+    freeCredits,
     hasActiveCode,
     activeCodeCredits,
     isLoading,

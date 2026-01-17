@@ -2,19 +2,24 @@ import React, { useState } from 'react';
 import { Menu, X, Sparkles, KeyRound, Camera } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { CodeActivationModal } from '@/components/features/CodeActivationModal';
+import { UserMenu } from '@/components/auth';
 
 interface HeaderProps {
   credits: number;
+  freeCredits: number;
   hasActiveCode?: boolean;
   activeCode?: string | null;
   onActivateCode?: (code: string) => Promise<{ success: boolean; error?: string; credits?: number }>;
+  onOpenLogin: () => void;
 }
 
-export function Header({ 
-  credits, 
+export function Header({
+  credits,
+  freeCredits,
   hasActiveCode = false,
   activeCode = null,
-  onActivateCode 
+  onActivateCode,
+  onOpenLogin
 }: HeaderProps) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isCodeModalOpen, setIsCodeModalOpen] = useState(false);
@@ -86,6 +91,9 @@ export function Header({
                 </div>
               )}
 
+              {/* User Menu (Login/Logout) */}
+              <UserMenu onOpenLogin={onOpenLogin} freeCredits={freeCredits} />
+
               {/* CTA Button */}
               <a href="#restaurar">
                 <Button variant="primary" size="sm">
@@ -107,22 +115,22 @@ export function Header({
           {isMobileMenuOpen && (
             <div className="md:hidden py-4 border-t border-white/5">
               <nav className="flex flex-col gap-4">
-                <a 
-                  href="#exemplos" 
+                <a
+                  href="#exemplos"
                   className="text-gray-400 hover:text-white transition-colors"
                   onClick={() => setIsMobileMenuOpen(false)}
                 >
                   Exemplos
                 </a>
-                <a 
-                  href="#como-funciona" 
+                <a
+                  href="#como-funciona"
                   className="text-gray-400 hover:text-white transition-colors"
                   onClick={() => setIsMobileMenuOpen(false)}
                 >
                   Como Funciona
                 </a>
-                <a 
-                  href="#precos" 
+                <a
+                  href="#precos"
                   className="text-gray-400 hover:text-white transition-colors"
                   onClick={() => setIsMobileMenuOpen(false)}
                 >
